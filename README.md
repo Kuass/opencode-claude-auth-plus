@@ -23,6 +23,19 @@ This plus build is customized for that workflow: after `cswap switch`, the next 
 - Console warnings and docs use the `opencode-claude-auth-plus` name so local debugging clearly identifies the custom build.
 - Regression tests cover default hot reload, configurable TTL caching, and Keychain-source reload behavior.
 
+## Upstream PR notes
+
+As of 2026-07-08, this fork has not cherry-picked any open upstream PRs. The `claude-swap` hot reload behavior is a local plus change. These upstream PRs were reviewed while shaping the fork:
+
+| PR                                                                                                                                              | Status                             | Comment                                                                                                                                                                          |
+| ----------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [#99](https://github.com/griffinmartin/opencode-claude-auth/pull/99)                                                                            | Partial overlap, not cherry-picked | The plus change also updates the active in-memory credentials after re-reading storage. It does not include #99's suffixed-Keychain primary fallback or account detail labeling. |
+| [#132](https://github.com/griffinmartin/opencode-claude-auth/pull/132)                                                                          | Not applied                        | Automatic account failover after usage exhaustion can conflict with the explicit `claude-swap` workflow, where the user chooses the next account intentionally.                  |
+| [#233](https://github.com/griffinmartin/opencode-claude-auth/pull/233) / [#239](https://github.com/griffinmartin/opencode-claude-auth/pull/239) | Good next candidates               | `XDG_DATA_HOME` and `CLAUDE_CONFIG_DIR` support are small, useful path fixes. They should be ported deliberately instead of importing the larger path-resolution PR wholesale.   |
+| [#238](https://github.com/griffinmartin/opencode-claude-auth/pull/238)                                                                          | Not applied                        | Proactive background refresh is lower priority because this fork refreshes/reloads on the request path. It may still be useful later for long idle sessions.                     |
+| [#143](https://github.com/griffinmartin/opencode-claude-auth/pull/143)                                                                          | Candidate                          | Capping invalid `thinking.budget_tokens` is a small defensive API compatibility fix, but the upstream PR currently conflicts and should be ported manually with tests.           |
+| [#198](https://github.com/griffinmartin/opencode-claude-auth/pull/198) / [#156](https://github.com/griffinmartin/opencode-claude-auth/pull/156) | Deferred                           | These change system prompt relocation policy. They are potentially valuable, but the behavior surface is broad enough to keep them out of the `claude-swap` hot reload patch.    |
+
 ## How it works
 
 The plugin registers its own auth provider with a custom fetch handler that intercepts all Anthropic API requests. It reads OAuth tokens from the macOS Keychain (or `~/.claude/.credentials.json` on other platforms), reloads the active credential source on every request by default, and handles the full request lifecycle — no builtin Anthropic auth plugin required. On macOS, multiple Claude Code accounts are detected automatically and can be switched via `opencode auth login`.
