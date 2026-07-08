@@ -6,6 +6,23 @@
 
 Self-contained Anthropic auth provider for OpenCode using your Claude Code credentials, with hot credential reload for tools like `claude-swap`.
 
+## Why this fork exists
+
+`opencode-claude-auth-plus` is a `claude-swap`-focused custom build of [`opencode-claude-auth`](https://github.com/griffinmartin/opencode-claude-auth).
+
+The upstream plugin discovers Claude Code credentials when OpenCode starts and keeps the selected account in memory. That works for normal OpenCode account selection, but it does not reliably notice an out-of-process credential change after [`claude-swap`](https://github.com/realiti4/claude-swap) switches the primary Claude Code account. In practice, OpenCode can keep using the old token until the process is restarted.
+
+This plus build is customized for that workflow: after `cswap switch`, the next Anthropic request from the same running OpenCode session re-reads the active Claude credential source and uses the updated token.
+
+## What's different from upstream
+
+- Package identity is changed to `opencode-claude-auth-plus`, with a plus entrypoint while keeping compatibility exports for the original entrypoint names.
+- Credential caching defaults to hot reload mode. `OPENCODE_CLAUDE_AUTH_CREDENTIAL_CACHE_TTL_MS` defaults to `0`, so the active credential source is checked on every request.
+- macOS Keychain credentials are re-read before use, including the primary `Claude Code-credentials` entry that `claude-swap` updates. Upstream only refreshed the credentials file path in this pre-use reload path.
+- The previous 30-second cache behavior can still be restored with `OPENCODE_CLAUDE_AUTH_CREDENTIAL_CACHE_TTL_MS=30000`.
+- Console warnings and docs use the `opencode-claude-auth-plus` name so local debugging clearly identifies the custom build.
+- Regression tests cover default hot reload, configurable TTL caching, and Keychain-source reload behavior.
+
 ## How it works
 
 The plugin registers its own auth provider with a custom fetch handler that intercepts all Anthropic API requests. It reads OAuth tokens from the macOS Keychain (or `~/.claude/.credentials.json` on other platforms), reloads the active credential source on every request by default, and handles the full request lifecycle — no builtin Anthropic auth plugin required. On macOS, multiple Claude Code accounts are detected automatically and can be switched via `opencode auth login`.
