@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.5.4-plus.0
+
+### Bug Fixes
+
+* reload every credential source on cache miss so `claude-swap` macOS Keychain switches are picked up without restarting OpenCode
+* default credential cache TTL to `0` for hot reload; set `OPENCODE_CLAUDE_AUTH_CREDENTIAL_CACHE_TTL_MS=30000` to restore upstream-style caching
+
 ## [1.5.4](https://github.com/griffinmartin/opencode-claude-auth/compare/v1.5.3...v1.5.4) (2026-05-15)
 
 

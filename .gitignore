@@ -3,6 +3,10 @@ node_modules/
 dist/
 .env
 *.env.local
+*.log
+*.tgz
+.DS_Store
+.idea/
 .sisyphus/
 .opencode/
 docs/

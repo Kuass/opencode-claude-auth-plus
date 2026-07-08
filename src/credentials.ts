@@ -21,7 +21,8 @@ import { log } from "./logger.ts"
 export type { ClaudeCredentials } from "./keychain.ts"
 export type { ClaudeAccount } from "./keychain.ts"
 
-const CREDENTIAL_CACHE_TTL_MS = 30_000
+const DEFAULT_CREDENTIAL_CACHE_TTL_MS = 0
+const CREDENTIAL_CACHE_TTL_ENV = "OPENCODE_CLAUDE_AUTH_CREDENTIAL_CACHE_TTL_MS"
 
 const accountCacheMap = new Map<
   string,
@@ -29,6 +30,24 @@ const accountCacheMap = new Map<
 >()
 let activeAccountSource: string | null = null
 let allAccounts: ClaudeAccount[] = []
+
+export function getCredentialCacheTtlMs(): number {
+  const raw = process.env[CREDENTIAL_CACHE_TTL_ENV]
+  if (raw === undefined || raw.trim() === "") {
+    return DEFAULT_CREDENTIAL_CACHE_TTL_MS
+  }
+
+  const parsed = Number.parseInt(raw, 10)
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    log("credential_cache_ttl_invalid", {
+      value: raw,
+      fallbackMs: DEFAULT_CREDENTIAL_CACHE_TTL_MS,
+    })
+    return DEFAULT_CREDENTIAL_CACHE_TTL_MS
+  }
+
+  return parsed
+}
 
 export function initAccounts(accounts: ClaudeAccount[]): void {
   allAccounts = accounts
@@ -273,14 +292,29 @@ export function refreshIfNeeded(
   const target = account ?? getActiveAccount()
   if (!target) return null
 
-  // Pick up external updates to .credentials.json (e.g. switch_claude_account
-  // on Windows). Bounded by getCachedCredentials's 30s TTL: fires at most
-  // ~2x/min under load. macOS keychain sources stay on the in-memory path;
-  // their state is mutated only by our own writeBackCredentials, so no
-  // external-update vector exists for them.
-  if (target.source === "file") {
-    const onDisk = refreshAccount(target.source)
-    if (onDisk) target.credentials = onDisk
+  // Pick up external updates from every credential source. Upstream only did
+  // this for .credentials.json, but claude-swap mutates the active macOS
+  // Keychain item out of process.
+  try {
+    const stored = refreshAccount(target.source)
+    if (stored) {
+      if (
+        stored.accessToken !== target.credentials.accessToken ||
+        stored.refreshToken !== target.credentials.refreshToken ||
+        stored.expiresAt !== target.credentials.expiresAt
+      ) {
+        log("credentials_reloaded_external", {
+          source: target.source,
+          expiresAt: stored.expiresAt,
+        })
+      }
+      target.credentials = stored
+    }
+  } catch (err) {
+    log("credentials_reload_external_failed", {
+      source: target.source,
+      error: err instanceof Error ? err.message : String(err),
+    })
   }
 
   const creds = target.credentials
@@ -343,15 +377,17 @@ export function getCachedCredentials(): ClaudeCredentials | null {
   if (!account) return null
 
   const now = Date.now()
+  const credentialCacheTtlMs = getCredentialCacheTtlMs()
   const cached = accountCacheMap.get(account.source)
   if (
     cached &&
-    now - cached.cachedAt < CREDENTIAL_CACHE_TTL_MS &&
+    credentialCacheTtlMs > 0 &&
+    now - cached.cachedAt < credentialCacheTtlMs &&
     cached.creds.expiresAt > now + 60_000
   ) {
     log("cache_hit", {
       source: account.source,
-      ttlRemaining: CREDENTIAL_CACHE_TTL_MS - (now - cached.cachedAt),
+      ttlRemaining: credentialCacheTtlMs - (now - cached.cachedAt),
     })
     return cached.creds
   }

@@ -1,7 +1,7 @@
 {
-  "name": "opencode-claude-auth",
-  "version": "1.5.4",
-  "description": "OpenCode plugin that uses your Claude Code credentials — no separate login needed.",
+  "name": "opencode-claude-auth-plus",
+  "version": "1.5.4-plus.0",
+  "description": "OpenCode plugin that uses your Claude Code credentials with hot credential reload support.",
   "keywords": [
     "anthropic",
     "auth",
@@ -15,22 +15,23 @@
     "url": "git+https://github.com/griffinmartin/opencode-claude-auth.git"
   },
   "files": [
+    "opencode-claude-auth-plus.js",
     "opencode-claude-auth.js",
     "dist",
     "installation.md"
   ],
   "type": "module",
-  "main": "opencode-claude-auth.js",
-  "module": "opencode-claude-auth.js",
+  "main": "opencode-claude-auth-plus.js",
+  "module": "opencode-claude-auth-plus.js",
   "types": "dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./opencode-claude-auth.js"
+      "import": "./opencode-claude-auth-plus.js"
     },
     "./server": {
       "types": "./dist/index.d.ts",
-      "import": "./opencode-claude-auth.js"
+      "import": "./opencode-claude-auth-plus.js"
     },
     "./claude-auth-plugin": {
       "types": "./dist/index.d.ts",
@@ -45,6 +46,14 @@
       "import": "./dist/index.js"
     },
     "./opencode-claude-auth.js": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./opencode-claude-auth-plus": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./opencode-claude-auth-plus.js": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     }

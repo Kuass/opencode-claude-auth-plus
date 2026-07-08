@@ -227,7 +227,7 @@ const plugin: Plugin = async () => {
     const error = err instanceof Error ? err.message : String(err)
     log("plugin_init_error", { error })
     console.warn(
-      "opencode-claude-auth: Failed to read Claude Code credentials:",
+      "opencode-claude-auth-plus: Failed to read Claude Code credentials:",
       error,
     )
     return {}
@@ -256,7 +256,7 @@ const plugin: Plugin = async () => {
       syncAuthJson(initialCreds)
     } else {
       console.warn(
-        "opencode-claude-auth: Claude credentials are expired and could not be refreshed. Run `claude` to re-authenticate.",
+        "opencode-claude-auth-plus: Claude credentials are expired and could not be refreshed. Run `claude` to re-authenticate.",
       )
     }
 
@@ -273,7 +273,7 @@ const plugin: Plugin = async () => {
   } else {
     log("plugin_init_no_accounts", { reason: "no credentials found" })
     console.warn(
-      "opencode-claude-auth: No Claude Code credentials found. Running in API key mode with transform hook enabled.",
+      "opencode-claude-auth-plus: No Claude Code credentials found. Running in API key mode with transform hook enabled.",
     )
   }
 
@@ -470,7 +470,7 @@ const plugin: Plugin = async () => {
                   } catch {}
                   log("fetch_error_response", { status, modelId, message })
                   console.warn(
-                    `opencode-claude-auth: API ${status} for ${modelId}: ${message}`,
+                    `opencode-claude-auth-plus: API ${status} for ${modelId}: ${message}`,
                   )
                 })
                 .catch(() => {})

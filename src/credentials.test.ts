@@ -19,6 +19,7 @@ async function loadCredentialsWithCountingKeychain(
   credentialsModule: {
     getCachedCredentials: () => Creds | null
     getCredentialsForSync: () => Creds | null
+    getCredentialCacheTtlMs: () => number
     refreshIfNeeded: (account?: {
       label: string
       source: string
@@ -108,6 +109,7 @@ export function __setCredentials(c) {
     credentialsModule: credentialsModule as {
       getCachedCredentials: () => Creds | null
       getCredentialsForSync: () => Creds | null
+      getCredentialCacheTtlMs: () => number
       refreshIfNeeded: (account?: {
         label: string
         source: string
@@ -124,7 +126,7 @@ export function __setCredentials(c) {
 }
 
 describe("credential caching", () => {
-  it("getCachedCredentials reuses cached credentials within 30 second TTL", async () => {
+  it("getCachedCredentials reloads source on every call by default", async () => {
     const originalNow = Date.now
     const now = 1_700_000_000_000
     Date.now = () => now
@@ -146,25 +148,71 @@ describe("credential caching", () => {
       ])
 
       const first = credentialsModule.getCachedCredentials()
+      keychainModule.__setCredentials({
+        accessToken: "swapped-token",
+        refreshToken: "swapped-refresh",
+        expiresAt: now + 10 * 60_000,
+      })
       const second = credentialsModule.getCachedCredentials()
 
       assert.ok(first)
       assert.ok(second)
-      assert.equal(keychainModule.__getReadCount(), 0)
+      assert.equal(first.accessToken, "token")
+      assert.equal(second.accessToken, "swapped-token")
+      assert.equal(keychainModule.__getReadCount(), 2)
     } finally {
       Date.now = originalNow
     }
   })
 
-  it("getCachedCredentials refreshes from source after TTL expires", async () => {
+  it("getCachedCredentials reuses cached credentials within configured TTL", async () => {
     const originalNow = Date.now
+    const originalTtl = process.env.OPENCODE_CLAUDE_AUTH_CREDENTIAL_CACHE_TTL_MS
     let now = 1_700_000_000_000
     Date.now = () => now
+    process.env.OPENCODE_CLAUDE_AUTH_CREDENTIAL_CACHE_TTL_MS = "30000"
 
     try {
-      const { credentialsModule } = await loadCredentialsWithCountingKeychain(
-        now + 10 * 60_000,
-      )
+      const { credentialsModule, keychainModule } =
+        await loadCredentialsWithCountingKeychain(now + 10 * 60_000)
+
+      credentialsModule.initAccounts([
+        {
+          label: "Account 1",
+          source: "keychain",
+          credentials: {
+            accessToken: "token",
+            refreshToken: "refresh",
+            expiresAt: now + 10 * 60_000,
+          },
+        },
+      ])
+
+      const first = credentialsModule.getCachedCredentials()
+      const second = credentialsModule.getCachedCredentials()
+      assert.ok(first)
+      assert.ok(second)
+      assert.equal(keychainModule.__getReadCount(), 1)
+    } finally {
+      Date.now = originalNow
+      if (typeof originalTtl === "string") {
+        process.env.OPENCODE_CLAUDE_AUTH_CREDENTIAL_CACHE_TTL_MS = originalTtl
+      } else {
+        delete process.env.OPENCODE_CLAUDE_AUTH_CREDENTIAL_CACHE_TTL_MS
+      }
+    }
+  })
+
+  it("getCachedCredentials refreshes from source after configured TTL expires", async () => {
+    const originalNow = Date.now
+    const originalTtl = process.env.OPENCODE_CLAUDE_AUTH_CREDENTIAL_CACHE_TTL_MS
+    let now = 1_700_000_000_000
+    Date.now = () => now
+    process.env.OPENCODE_CLAUDE_AUTH_CREDENTIAL_CACHE_TTL_MS = "30000"
+
+    try {
+      const { credentialsModule, keychainModule } =
+        await loadCredentialsWithCountingKeychain(now + 10 * 60_000)
 
       credentialsModule.initAccounts([
         {
@@ -186,8 +234,50 @@ describe("credential caching", () => {
       const second = credentialsModule.getCachedCredentials()
       assert.ok(second)
       assert.equal(second.accessToken, "token")
+      assert.equal(keychainModule.__getReadCount(), 2)
     } finally {
       Date.now = originalNow
+      if (typeof originalTtl === "string") {
+        process.env.OPENCODE_CLAUDE_AUTH_CREDENTIAL_CACHE_TTL_MS = originalTtl
+      } else {
+        delete process.env.OPENCODE_CLAUDE_AUTH_CREDENTIAL_CACHE_TTL_MS
+      }
+    }
+  })
+
+  it("getCredentialCacheTtlMs defaults to zero for hot reload", async () => {
+    const originalTtl = process.env.OPENCODE_CLAUDE_AUTH_CREDENTIAL_CACHE_TTL_MS
+    delete process.env.OPENCODE_CLAUDE_AUTH_CREDENTIAL_CACHE_TTL_MS
+
+    try {
+      const { credentialsModule } = await loadCredentialsWithCountingKeychain(
+        Date.now() + 10 * 60_000,
+      )
+
+      assert.equal(credentialsModule.getCredentialCacheTtlMs(), 0)
+    } finally {
+      if (typeof originalTtl === "string") {
+        process.env.OPENCODE_CLAUDE_AUTH_CREDENTIAL_CACHE_TTL_MS = originalTtl
+      }
+    }
+  })
+
+  it("getCredentialCacheTtlMs accepts non-negative env override", async () => {
+    const originalTtl = process.env.OPENCODE_CLAUDE_AUTH_CREDENTIAL_CACHE_TTL_MS
+    process.env.OPENCODE_CLAUDE_AUTH_CREDENTIAL_CACHE_TTL_MS = "30000"
+
+    try {
+      const { credentialsModule } = await loadCredentialsWithCountingKeychain(
+        Date.now() + 10 * 60_000,
+      )
+
+      assert.equal(credentialsModule.getCredentialCacheTtlMs(), 30_000)
+    } finally {
+      if (typeof originalTtl === "string") {
+        process.env.OPENCODE_CLAUDE_AUTH_CREDENTIAL_CACHE_TTL_MS = originalTtl
+      } else {
+        delete process.env.OPENCODE_CLAUDE_AUTH_CREDENTIAL_CACHE_TTL_MS
+      }
     }
   })
 
@@ -319,6 +409,41 @@ describe("credential caching", () => {
         "new-token",
         "account.credentials should be updated in place so future calls see the new tokens",
       )
+    } finally {
+      Date.now = originalNow
+    }
+  })
+
+  it("refreshIfNeeded reloads keychain-source credentials on every call", async () => {
+    const originalNow = Date.now
+    const now = 1_700_000_000_000
+    Date.now = () => now
+
+    try {
+      const { credentialsModule, keychainModule } =
+        await loadCredentialsWithCountingKeychain(now + 10 * 60_000)
+
+      const account = {
+        label: "Account 1",
+        source: "Claude Code-credentials",
+        credentials: {
+          accessToken: "old-token",
+          refreshToken: "old-refresh",
+          expiresAt: now + 10 * 60_000,
+        },
+      }
+
+      keychainModule.__setCredentials({
+        accessToken: "new-token",
+        refreshToken: "new-refresh",
+        expiresAt: now + 10 * 60_000,
+      })
+
+      const result = credentialsModule.refreshIfNeeded(account)
+
+      assert.ok(result)
+      assert.equal(result.accessToken, "new-token")
+      assert.equal(account.credentials.accessToken, "new-token")
     } finally {
       Date.now = originalNow
     }

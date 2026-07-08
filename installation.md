@@ -1,4 +1,4 @@
-# Install opencode-claude-auth
+# Install opencode-claude-auth-plus
 
 These instructions are designed for AI coding agents.
 
@@ -46,11 +46,11 @@ This will prompt you to log in and store credentials in Keychain (macOS) or `~/.
 
 Edit the OpenCode configuration file at `~/.config/opencode/opencode.json`.
 
-Add `opencode-claude-auth@latest` to the `plugin` array:
+Add `opencode-claude-auth-plus@latest` to the `plugin` array:
 
 ```json
 {
-  "plugin": ["opencode-claude-auth@latest"]
+  "plugin": ["opencode-claude-auth-plus@latest"]
 }
 ```
 
@@ -60,10 +60,10 @@ Or run this command to do it automatically:
 node -e "
 const fs = require('fs'), p = require('path').join(require('os').homedir(), '.config/opencode/opencode.json');
 const c = fs.existsSync(p) ? JSON.parse(fs.readFileSync(p,'utf8')) : {};
-c.plugin = [...new Set([...(Array.isArray(c.plugin) ? c.plugin : []), 'opencode-claude-auth@latest'])];
+c.plugin = [...new Set([...(Array.isArray(c.plugin) ? c.plugin : []), 'opencode-claude-auth-plus@latest'])];
 fs.mkdirSync(require('path').dirname(p), {recursive:true});
 fs.writeFileSync(p, JSON.stringify(c, null, 2));
-console.log('Added opencode-claude-auth@latest to', p);
+console.log('Added opencode-claude-auth-plus@latest to', p);
 "
 ```
 
@@ -77,16 +77,16 @@ Verify the plugin was added:
 cat ~/.config/opencode/opencode.json
 ```
 
-You should see `opencode-claude-auth@latest` in the `plugin` array.
+You should see `opencode-claude-auth-plus@latest` in the `plugin` array.
 
 ## Upgrading
 
-If you previously installed `opencode-claude-auth` without the `@latest` tag, update your config to use `opencode-claude-auth@latest` as shown above.
+If you previously installed `opencode-claude-auth-plus` without the `@latest` tag, update your config to use `opencode-claude-auth-plus@latest` as shown above.
 
 If the plugin isn't picking up a new version, clear the cached package and restart OpenCode:
 
 ```bash
-rm -rf ~/.cache/opencode/packages/opencode-claude-auth@latest/
+rm -rf ~/.cache/opencode/packages/opencode-claude-auth-plus@latest/
 ```
 
 ## Done
