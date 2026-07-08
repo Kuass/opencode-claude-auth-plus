@@ -6,6 +6,7 @@ import { join } from "node:path"
 import { tmpdir } from "node:os"
 import {
   buildAccountLabels,
+  refreshAccount,
   updateCredentialBlob,
   writeBackCredentials,
 } from "./keychain.ts"
@@ -93,6 +94,14 @@ function readCredentialsFile(credPath: string): {
     return parseCredentials(raw)
   } catch {
     return null
+  }
+}
+
+function restoreEnv(name: string, value: string | undefined): void {
+  if (typeof value === "string") {
+    process.env[name] = value
+  } else {
+    delete process.env[name]
   }
 }
 
@@ -501,8 +510,10 @@ describe("updateCredentialBlob", () => {
 describe("writeBackCredentials (file source)", () => {
   it("reads, updates, and writes back credentials to file", async () => {
     const originalHome = process.env.HOME
+    const originalClaudeConfigDir = process.env.CLAUDE_CONFIG_DIR
     const tempHome = await mkdtemp(join(tmpdir(), "opencode-claude-auth-wb-"))
     process.env.HOME = tempHome
+    delete process.env.CLAUDE_CONFIG_DIR
 
     try {
       const claudeDir = join(tempHome, ".claude")
@@ -538,11 +549,8 @@ describe("writeBackCredentials (file source)", () => {
         "should preserve other fields",
       )
     } finally {
-      if (typeof originalHome === "string") {
-        process.env.HOME = originalHome
-      } else {
-        delete process.env.HOME
-      }
+      restoreEnv("HOME", originalHome)
+      restoreEnv("CLAUDE_CONFIG_DIR", originalClaudeConfigDir)
       rmSync(tempHome, { recursive: true, force: true })
     }
   })
@@ -551,10 +559,12 @@ describe("writeBackCredentials (file source)", () => {
     if (process.platform === "win32") return
 
     const originalHome = process.env.HOME
+    const originalClaudeConfigDir = process.env.CLAUDE_CONFIG_DIR
     const tempHome = await mkdtemp(
       join(tmpdir(), "opencode-claude-auth-wb-perms-"),
     )
     process.env.HOME = tempHome
+    delete process.env.CLAUDE_CONFIG_DIR
 
     try {
       const claudeDir = join(tempHome, ".claude")
@@ -576,21 +586,20 @@ describe("writeBackCredentials (file source)", () => {
       const mode = statSync(credPath).mode & 0o777
       assert.equal(mode, 0o600, `Expected 0o600, got 0o${mode.toString(8)}`)
     } finally {
-      if (typeof originalHome === "string") {
-        process.env.HOME = originalHome
-      } else {
-        delete process.env.HOME
-      }
+      restoreEnv("HOME", originalHome)
+      restoreEnv("CLAUDE_CONFIG_DIR", originalClaudeConfigDir)
       rmSync(tempHome, { recursive: true, force: true })
     }
   })
 
   it("returns false when credentials file does not exist", async () => {
     const originalHome = process.env.HOME
+    const originalClaudeConfigDir = process.env.CLAUDE_CONFIG_DIR
     const tempHome = await mkdtemp(
       join(tmpdir(), "opencode-claude-auth-wb-missing-"),
     )
     process.env.HOME = tempHome
+    delete process.env.CLAUDE_CONFIG_DIR
 
     try {
       const result = writeBackCredentials("file", {
@@ -600,21 +609,20 @@ describe("writeBackCredentials (file source)", () => {
       })
       assert.equal(result, false)
     } finally {
-      if (typeof originalHome === "string") {
-        process.env.HOME = originalHome
-      } else {
-        delete process.env.HOME
-      }
+      restoreEnv("HOME", originalHome)
+      restoreEnv("CLAUDE_CONFIG_DIR", originalClaudeConfigDir)
       rmSync(tempHome, { recursive: true, force: true })
     }
   })
 
   it("returns false when credentials file contains invalid JSON", async () => {
     const originalHome = process.env.HOME
+    const originalClaudeConfigDir = process.env.CLAUDE_CONFIG_DIR
     const tempHome = await mkdtemp(
       join(tmpdir(), "opencode-claude-auth-wb-invalid-"),
     )
     process.env.HOME = tempHome
+    delete process.env.CLAUDE_CONFIG_DIR
 
     try {
       const claudeDir = join(tempHome, ".claude")
@@ -628,12 +636,77 @@ describe("writeBackCredentials (file source)", () => {
       })
       assert.equal(result, false)
     } finally {
-      if (typeof originalHome === "string") {
-        process.env.HOME = originalHome
-      } else {
-        delete process.env.HOME
-      }
+      restoreEnv("HOME", originalHome)
+      restoreEnv("CLAUDE_CONFIG_DIR", originalClaudeConfigDir)
       rmSync(tempHome, { recursive: true, force: true })
+    }
+  })
+
+  it("reads credentials from CLAUDE_CONFIG_DIR", async () => {
+    const originalClaudeConfigDir = process.env.CLAUDE_CONFIG_DIR
+    const tempClaudeConfigDir = await mkdtemp(
+      join(tmpdir(), "opencode-claude-auth-config-dir-"),
+    )
+    process.env.CLAUDE_CONFIG_DIR = tempClaudeConfigDir
+
+    try {
+      writeFileSync(
+        join(tempClaudeConfigDir, ".credentials.json"),
+        JSON.stringify({
+          claudeAiOauth: {
+            accessToken: "config-at",
+            refreshToken: "config-rt",
+            expiresAt: 1700000000000,
+          },
+        }),
+      )
+
+      assert.deepEqual(refreshAccount("file"), {
+        accessToken: "config-at",
+        refreshToken: "config-rt",
+        expiresAt: 1700000000000,
+        subscriptionType: undefined,
+      })
+    } finally {
+      restoreEnv("CLAUDE_CONFIG_DIR", originalClaudeConfigDir)
+      rmSync(tempClaudeConfigDir, { recursive: true, force: true })
+    }
+  })
+
+  it("writes credentials back to CLAUDE_CONFIG_DIR", async () => {
+    const originalClaudeConfigDir = process.env.CLAUDE_CONFIG_DIR
+    const tempClaudeConfigDir = await mkdtemp(
+      join(tmpdir(), "opencode-claude-auth-config-write-"),
+    )
+    process.env.CLAUDE_CONFIG_DIR = tempClaudeConfigDir
+
+    try {
+      const credPath = join(tempClaudeConfigDir, ".credentials.json")
+      writeFileSync(
+        credPath,
+        JSON.stringify({
+          claudeAiOauth: {
+            accessToken: "old-at",
+            refreshToken: "old-rt",
+            expiresAt: 1000,
+          },
+        }),
+      )
+
+      const result = writeBackCredentials("file", {
+        accessToken: "new-at",
+        refreshToken: "new-rt",
+        expiresAt: 2000,
+      })
+
+      assert.equal(result, true)
+      const written = JSON.parse(readFileSync(credPath, "utf-8"))
+      assert.equal(written.claudeAiOauth.accessToken, "new-at")
+      assert.equal(written.claudeAiOauth.refreshToken, "new-rt")
+      assert.equal(written.claudeAiOauth.expiresAt, 2000)
+    } finally {
+      restoreEnv("CLAUDE_CONFIG_DIR", originalClaudeConfigDir)
+      rmSync(tempClaudeConfigDir, { recursive: true, force: true })
     }
   })
 })

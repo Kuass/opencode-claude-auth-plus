@@ -25,7 +25,7 @@ If this returns credentials, you're authenticated. If it fails or returns nothin
 ### Check Claude Code credentials (fallback for all platforms)
 
 ```bash
-cat ~/.claude/.credentials.json
+cat "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/.credentials.json"
 ```
 
 If this file exists and contains valid JSON, you're authenticated.
@@ -38,7 +38,7 @@ Run Claude Code to authenticate:
 claude
 ```
 
-This will prompt you to log in and store credentials in Keychain (macOS) or `~/.claude/.credentials.json` (other platforms).
+This will prompt you to log in and store credentials in Keychain (macOS) or `~/.claude/.credentials.json` (other platforms). If you set `CLAUDE_CONFIG_DIR`, the plugin reads `.credentials.json` from that directory instead.
 
 ## Installation
 

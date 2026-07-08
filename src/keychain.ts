@@ -19,6 +19,15 @@ export interface ClaudeAccount {
 
 const PRIMARY_SERVICE = "Claude Code-credentials"
 
+function getClaudeCredentialsPath(): string {
+  const configDir = process.env.CLAUDE_CONFIG_DIR
+  const baseDir =
+    configDir && configDir.trim() !== ""
+      ? configDir
+      : join(homedir(), ".claude")
+  return join(baseDir, ".credentials.json")
+}
+
 function parseCredentials(raw: string): ClaudeCredentials | null {
   let parsed: unknown
   try {
@@ -175,7 +184,7 @@ function listClaudeKeychainServices(): string[] {
 
 function readCredentialsFile(): ClaudeCredentials | null {
   try {
-    const credPath = join(homedir(), ".claude", ".credentials.json")
+    const credPath = getClaudeCredentialsPath()
     const raw = readFileSync(credPath, "utf-8")
     const creds = parseCredentials(raw)
     log("credentials_file_read", { success: creds !== null })
@@ -295,7 +304,7 @@ export function writeBackCredentials(
 
   if (source === "file") {
     try {
-      const credPath = join(homedir(), ".claude", ".credentials.json")
+      const credPath = getClaudeCredentialsPath()
       const raw = readFileSync(credPath, "utf-8")
       const updated = updateCredentialBlob(raw, newCreds)
       if (!updated) return false

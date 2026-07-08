@@ -1,7 +1,20 @@
 import { describe, it } from "node:test"
 import assert from "node:assert/strict"
-import { refreshViaOAuth, parseOAuthResponse } from "./credentials.ts"
-import { chmodSync, mkdirSync, statSync, writeFileSync } from "node:fs"
+import {
+  refreshViaOAuth,
+  parseOAuthResponse,
+  syncAuthJson,
+  saveAccountSource,
+  loadPersistedAccountSource,
+} from "./credentials.ts"
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  statSync,
+  writeFileSync,
+} from "node:fs"
 import { mkdtemp, readFile, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -11,6 +24,14 @@ type Creds = {
   accessToken: string
   refreshToken: string
   expiresAt: number
+}
+
+function restoreEnv(name: string, value: string | undefined): void {
+  if (typeof value === "string") {
+    process.env[name] = value
+  } else {
+    delete process.env[name]
+  }
 }
 
 async function loadCredentialsWithCountingKeychain(
@@ -499,10 +520,12 @@ describe("syncAuthJson file permissions", () => {
     if (process.platform === "win32") return // Windows doesn't support Unix permissions
 
     const originalHome = process.env.HOME
+    const originalXdgDataHome = process.env.XDG_DATA_HOME
     const tempHome = await mkdtemp(
       join(tmpdir(), "opencode-claude-auth-perms-"),
     )
     process.env.HOME = tempHome
+    delete process.env.XDG_DATA_HOME
 
     try {
       const tempDir = await mkdtemp(
@@ -563,11 +586,8 @@ export function buildAccountLabels(creds) { return creds.map((_, i) => \`Account
         `Expected file mode 0o600, got 0o${mode.toString(8)}`,
       )
     } finally {
-      if (typeof originalHome === "string") {
-        process.env.HOME = originalHome
-      } else {
-        delete process.env.HOME
-      }
+      restoreEnv("HOME", originalHome)
+      restoreEnv("XDG_DATA_HOME", originalXdgDataHome)
     }
   })
 
@@ -575,10 +595,12 @@ export function buildAccountLabels(creds) { return creds.map((_, i) => \`Account
     if (process.platform === "win32") return
 
     const originalHome = process.env.HOME
+    const originalXdgDataHome = process.env.XDG_DATA_HOME
     const tempHome = await mkdtemp(
       join(tmpdir(), "opencode-claude-auth-perms2-"),
     )
     process.env.HOME = tempHome
+    delete process.env.XDG_DATA_HOME
 
     try {
       // Create auth.json with permissive mode first
@@ -640,11 +662,59 @@ export function buildAccountLabels(creds) { return creds.map((_, i) => \`Account
         `Expected tightened mode 0o600, got 0o${mode.toString(8)}`,
       )
     } finally {
-      if (typeof originalHome === "string") {
-        process.env.HOME = originalHome
-      } else {
-        delete process.env.HOME
-      }
+      restoreEnv("HOME", originalHome)
+      restoreEnv("XDG_DATA_HOME", originalXdgDataHome)
+    }
+  })
+
+  it("respects XDG_DATA_HOME for auth.json on non-Windows", async () => {
+    if (process.platform === "win32") return
+
+    const originalXdgDataHome = process.env.XDG_DATA_HOME
+    const tempXdgDataHome = await mkdtemp(
+      join(tmpdir(), "opencode-claude-auth-xdg-"),
+    )
+    process.env.XDG_DATA_HOME = tempXdgDataHome
+
+    try {
+      syncAuthJson({
+        accessToken: "tok",
+        refreshToken: "ref",
+        expiresAt: Date.now() + 600_000,
+      })
+
+      const authPath = join(tempXdgDataHome, "opencode", "auth.json")
+      assert.ok(existsSync(authPath))
+      const auth = JSON.parse(readFileSync(authPath, "utf-8"))
+      assert.equal(auth.anthropic.access, "tok")
+    } finally {
+      restoreEnv("XDG_DATA_HOME", originalXdgDataHome)
+    }
+  })
+})
+
+describe("account persistence paths", () => {
+  it("respects XDG_DATA_HOME for claude-account-source.txt on non-Windows", async () => {
+    if (process.platform === "win32") return
+
+    const originalXdgDataHome = process.env.XDG_DATA_HOME
+    const tempXdgDataHome = await mkdtemp(
+      join(tmpdir(), "opencode-claude-auth-state-xdg-"),
+    )
+    process.env.XDG_DATA_HOME = tempXdgDataHome
+
+    try {
+      saveAccountSource("Claude Code-credentials")
+
+      const statePath = join(
+        tempXdgDataHome,
+        "opencode",
+        "claude-account-source.txt",
+      )
+      assert.equal(readFileSync(statePath, "utf-8"), "Claude Code-credentials")
+      assert.equal(loadPersistedAccountSource(), "Claude Code-credentials")
+    } finally {
+      restoreEnv("XDG_DATA_HOME", originalXdgDataHome)
     }
   })
 })

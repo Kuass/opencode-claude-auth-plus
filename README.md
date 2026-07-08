@@ -20,18 +20,19 @@ This plus build is customized for that workflow: after `cswap switch`, the next 
 - Credential caching defaults to hot reload mode. `OPENCODE_CLAUDE_AUTH_CREDENTIAL_CACHE_TTL_MS` defaults to `0`, so the active credential source is checked on every request.
 - macOS Keychain credentials are re-read before use, including the primary `Claude Code-credentials` entry that `claude-swap` updates. Upstream only refreshed the credentials file path in this pre-use reload path.
 - The previous 30-second cache behavior can still be restored with `OPENCODE_CLAUDE_AUTH_CREDENTIAL_CACHE_TTL_MS=30000`.
+- OpenCode data paths respect `XDG_DATA_HOME`, and Claude credential-file paths respect `CLAUDE_CONFIG_DIR`.
 - Console warnings and docs use the `opencode-claude-auth-plus` name so local debugging clearly identifies the custom build.
 - Regression tests cover default hot reload, configurable TTL caching, and Keychain-source reload behavior.
 
 ## Upstream PR notes
 
-As of 2026-07-08, this fork has not cherry-picked any open upstream PRs. The `claude-swap` hot reload behavior is a local plus change. These upstream PRs were reviewed while shaping the fork:
+As of 2026-07-08, this fork has ported selected upstream PR behavior manually on top of the local `claude-swap` hot reload change:
 
 | PR                                                                                                                                              | Status                             | Comment                                                                                                                                                                          |
 | ----------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [#99](https://github.com/griffinmartin/opencode-claude-auth/pull/99)                                                                            | Partial overlap, not cherry-picked | The plus change also updates the active in-memory credentials after re-reading storage. It does not include #99's suffixed-Keychain primary fallback or account detail labeling. |
 | [#132](https://github.com/griffinmartin/opencode-claude-auth/pull/132)                                                                          | Not applied                        | Automatic account failover after usage exhaustion can conflict with the explicit `claude-swap` workflow, where the user chooses the next account intentionally.                  |
-| [#233](https://github.com/griffinmartin/opencode-claude-auth/pull/233) / [#239](https://github.com/griffinmartin/opencode-claude-auth/pull/239) | Good next candidates               | `XDG_DATA_HOME` and `CLAUDE_CONFIG_DIR` support are small, useful path fixes. They should be ported deliberately instead of importing the larger path-resolution PR wholesale.   |
+| [#233](https://github.com/griffinmartin/opencode-claude-auth/pull/233) / [#239](https://github.com/griffinmartin/opencode-claude-auth/pull/239) | Applied manually                   | `XDG_DATA_HOME` is used for OpenCode auth/account-state paths on non-Windows, and `CLAUDE_CONFIG_DIR` is used for `.credentials.json`.                                           |
 | [#238](https://github.com/griffinmartin/opencode-claude-auth/pull/238)                                                                          | Not applied                        | Proactive background refresh is lower priority because this fork refreshes/reloads on the request path. It may still be useful later for long idle sessions.                     |
 | [#143](https://github.com/griffinmartin/opencode-claude-auth/pull/143)                                                                          | Candidate                          | Capping invalid `thinking.budget_tokens` is a small defensive API compatibility fix, but the upstream PR currently conflicts and should be ported manually with tests.           |
 | [#198](https://github.com/griffinmartin/opencode-claude-auth/pull/198) / [#156](https://github.com/griffinmartin/opencode-claude-auth/pull/156) | Deferred                           | These change system prompt relocation policy. They are potentially valuable, but the behavior surface is broad enough to keep them out of the `claude-swap` hot reload patch.    |
@@ -121,7 +122,7 @@ Just run OpenCode. The plugin handles auth automatically — it reads your Claud
 The plugin checks these in order:
 
 1. macOS Keychain (all `Claude Code-credentials*` entries — multiple accounts are detected automatically)
-2. `~/.claude/.credentials.json` (fallback, works on all platforms)
+2. `~/.claude/.credentials.json` (fallback, works on all platforms; override the directory with `CLAUDE_CONFIG_DIR`)
 
 ## Multiple accounts (macOS)
 
@@ -240,8 +241,10 @@ All configurable parameters can be overridden via environment variables. If Anth
 | `ANTHROPIC_BETA_FLAGS`                         | Comma-separated beta feature flags                                                                                                                                                     | `claude-code-20250219,oauth-2025-04-20,interleaved-thinking-2025-05-14,prompt-caching-scope-2026-01-05` |
 | `ANTHROPIC_ENABLE_1M_CONTEXT`                  | Enable 1M token context window for 4.6+ models (requires Max subscription)                                                                                                             | `false`                                                                                                 |
 | `CLAUDE_AUTH_DEBUG`                            | Enable diagnostic logging (`1` for default path, or a custom file path)                                                                                                                | disabled                                                                                                |
+| `CLAUDE_CONFIG_DIR`                            | Directory containing `.credentials.json` for non-Keychain Claude Code credential fallback and write-back.                                                                              | `~/.claude`                                                                                             |
 | `OPENCODE_CLAUDE_AUTH_CREDENTIAL_CACHE_TTL_MS` | Credential cache TTL in milliseconds. `0` means re-read the active credential source on every request, which makes `claude-swap` switches effective on the next request.               | `0`                                                                                                     |
 | `OPENCODE_CLAUDE_AUTH_MAX_RETRY_MS`            | Max ms the plugin waits when honouring a 429/529 `retry-after` header. Beyond this cap the response surfaces immediately so OpenCode doesn't appear to hang on hour-long quota resets. | `30000`                                                                                                 |
+| `XDG_DATA_HOME`                                | OpenCode data root used for `auth.json` sync and `claude-account-source.txt` on non-Windows platforms.                                                                                 | `~/.local/share`                                                                                        |
 
 Example:
 
