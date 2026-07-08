@@ -42,51 +42,62 @@ This will prompt you to log in and store credentials in Keychain (macOS) or `~/.
 
 ## Installation
 
-### Step 1: Add to OpenCode configuration
+### Step 1: Build the plugin
 
-Edit the OpenCode configuration file at `~/.config/opencode/opencode.json`.
+Run these commands from this repository checkout:
 
-Add `opencode-claude-auth-plus@latest` to the `plugin` array:
+```bash
+npx pnpm@10.32.1 install --frozen-lockfile
+npx pnpm@10.32.1 run build
+```
+
+### Step 2: Create a local OpenCode plugin shim
+
+Create `~/.config/opencode/plugins/opencode-claude-auth-plus.ts` with an absolute import path to this checkout's compiled plugin:
+
+```bash
+mkdir -p ~/.config/opencode/plugins
+
+cat > ~/.config/opencode/plugins/opencode-claude-auth-plus.ts <<'EOF'
+export {
+  ClaudeAuthPlugin,
+  default,
+} from "/absolute/path/to/opencode-claude-auth-plus/dist/index.js"
+EOF
+```
+
+Replace `/absolute/path/to/opencode-claude-auth-plus` with this repository's absolute path.
+
+### Step 3: Add to OpenCode configuration
+
+Edit `~/.config/opencode/opencode.json` or `~/.config/opencode/opencode.jsonc`.
+
+Add the local plugin to the `plugin` array:
 
 ```json
 {
-  "plugin": ["opencode-claude-auth-plus@latest"]
+  "plugin": ["./plugins/opencode-claude-auth-plus.ts"]
 }
 ```
 
-Or run this command to do it automatically:
+Remove `opencode-claude-auth` from the same plugin list if it is present. Loading both plugins can make the Anthropic auth provider ambiguous.
 
-```bash
-node -e "
-const fs = require('fs'), p = require('path').join(require('os').homedir(), '.config/opencode/opencode.json');
-const c = fs.existsSync(p) ? JSON.parse(fs.readFileSync(p,'utf8')) : {};
-c.plugin = [...new Set([...(Array.isArray(c.plugin) ? c.plugin : []), 'opencode-claude-auth-plus@latest'])];
-fs.mkdirSync(require('path').dirname(p), {recursive:true});
-fs.writeFileSync(p, JSON.stringify(c, null, 2));
-console.log('Added opencode-claude-auth-plus@latest to', p);
-"
-```
-
-The `@latest` tag ensures OpenCode always pulls the newest version on startup. No manual `npm install` is needed — OpenCode [automatically installs npm plugins using Bun at startup](https://opencode.ai/docs/plugins/#how-plugins-are-installed).
-
-### Step 2: Verification
+### Step 4: Verification
 
 Verify the plugin was added:
 
 ```bash
-cat ~/.config/opencode/opencode.json
+cat ~/.config/opencode/opencode.json 2>/dev/null || cat ~/.config/opencode/opencode.jsonc
 ```
 
-You should see `opencode-claude-auth-plus@latest` in the `plugin` array.
+You should see `./plugins/opencode-claude-auth-plus.ts` in the `plugin` array.
 
 ## Upgrading
 
-If you previously installed `opencode-claude-auth-plus` without the `@latest` tag, update your config to use `opencode-claude-auth-plus@latest` as shown above.
-
-If the plugin isn't picking up a new version, clear the cached package and restart OpenCode:
+When this repo changes, rebuild the local plugin and restart OpenCode:
 
 ```bash
-rm -rf ~/.cache/opencode/packages/opencode-claude-auth-plus@latest/
+npx pnpm@10.32.1 run build
 ```
 
 ## Done
