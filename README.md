@@ -1,7 +1,7 @@
 # opencode-claude-auth-plus
 
 [![npm](https://img.shields.io/npm/v/opencode-claude-auth-plus)](https://www.npmjs.com/package/opencode-claude-auth-plus)
-[![CI](https://github.com/griffinmartin/opencode-claude-auth/actions/workflows/ci.yml/badge.svg)](https://github.com/griffinmartin/opencode-claude-auth/actions/workflows/ci.yml)
+[![CI](https://github.com/Kuass/opencode-claude-auth-plus/actions/workflows/ci.yml/badge.svg)](https://github.com/Kuass/opencode-claude-auth-plus/actions/workflows/ci.yml)
 [![Socket Badge](https://socket.dev/api/badge/npm/package/opencode-claude-auth-plus)](https://socket.dev/npm/package/opencode-claude-auth-plus)
 
 Self-contained Anthropic auth provider for OpenCode using your Claude Code credentials, with hot credential reload for tools like `claude-swap`.

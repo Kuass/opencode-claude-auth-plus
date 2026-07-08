@@ -12,7 +12,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/griffinmartin/opencode-claude-auth.git"
+    "url": "git+https://github.com/Kuass/opencode-claude-auth-plus.git"
   },
   "files": [
     "opencode-claude-auth-plus.js",
