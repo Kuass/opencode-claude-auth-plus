@@ -117,6 +117,10 @@ function getMaxRetryDelayMs(): number {
   return DEFAULT_MAX_RETRY_DELAY_MS
 }
 
+function isRetry429Enabled(): boolean {
+  return process.env.OPENCODE_CLAUDE_AUTH_RETRY_429?.toLowerCase() === "true"
+}
+
 export async function fetchWithRetry(
   input: RequestInfo | URL,
   init?: RequestInit,
@@ -125,7 +129,22 @@ export async function fetchWithRetry(
 ): Promise<Response> {
   for (let i = 0; i < retries; i++) {
     const res = await fetchImpl(input, init)
-    if ((res.status === 429 || res.status === 529) && i < retries - 1) {
+    const retry429Enabled = isRetry429Enabled()
+
+    // Surface 429 responses immediately unless capped retries are explicitly
+    // enabled. 529 overload responses remain retryable by default.
+    if (res.status === 429 && !retry429Enabled) {
+      const retryAfter = res.headers.get("retry-after")
+      log("fetch_429_retry_skipped", {
+        status: res.status,
+        retryAfter: retryAfter ?? "none",
+      })
+      return res
+    }
+
+    const shouldRetry =
+      res.status === 529 || (res.status === 429 && retry429Enabled)
+    if (shouldRetry && i < retries - 1) {
       const retryAfter = res.headers.get("retry-after")
       const parsed = retryAfter ? parseInt(retryAfter, 10) : NaN
       const delay = Number.isNaN(parsed) ? (i + 1) * 2000 : parsed * 1000

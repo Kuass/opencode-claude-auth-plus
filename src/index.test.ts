@@ -444,13 +444,11 @@ export function buildAccountLabels(creds) { return creds.map((_, i) => \`Account
     assert.equal(headers.get("x-stainless-runtime"), "custom-runtime")
   })
 
-  it("fetchWithRetry retries on 429 and succeeds", async () => {
+  it("fetchWithRetry returns 429 immediately by default", async () => {
     let callCount = 0
     const mockFetch = (() => {
       callCount++
-      if (callCount === 1)
-        return Promise.resolve(new Response("rate limited", { status: 429 }))
-      return Promise.resolve(new Response("ok", { status: 200 }))
+      return Promise.resolve(new Response("rate limited", { status: 429 }))
     }) as unknown as typeof fetch
     const res = await helpers.fetchWithRetry(
       "https://example.com",
@@ -458,8 +456,74 @@ export function buildAccountLabels(creds) { return creds.map((_, i) => \`Account
       3,
       mockFetch,
     )
-    assert.equal(res.status, 200)
-    assert.equal(callCount, 2)
+    assert.equal(res.status, 429)
+    assert.equal(callCount, 1)
+  })
+
+  it("fetchWithRetry preserves the default 429 response body and headers", async () => {
+    let callCount = 0
+    const mockFetch = (() => {
+      callCount++
+      return Promise.resolve(
+        new Response('{"error":"rate_limited"}', {
+          status: 429,
+          headers: {
+            "content-type": "application/json",
+            "retry-after": "30",
+            "x-request-id": "request-429",
+          },
+        }),
+      )
+    }) as unknown as typeof fetch
+
+    const res = await helpers.fetchWithRetry(
+      "https://example.com",
+      {},
+      3,
+      mockFetch,
+    )
+
+    assert.equal(callCount, 1)
+    assert.equal(res.status, 429)
+    assert.equal(res.headers.get("retry-after"), "30")
+    assert.equal(res.headers.get("x-request-id"), "request-429")
+    assert.equal(res.headers.get("content-type"), "application/json")
+    assert.equal(await res.text(), '{"error":"rate_limited"}')
+  })
+
+  it("fetchWithRetry retries 429 when explicitly enabled and succeeds", async () => {
+    const originalRetry429 = process.env.OPENCODE_CLAUDE_AUTH_RETRY_429
+    process.env.OPENCODE_CLAUDE_AUTH_RETRY_429 = "TrUe"
+    let callCount = 0
+    const mockFetch = (() => {
+      callCount++
+      if (callCount === 1) {
+        return Promise.resolve(
+          new Response("rate limited", {
+            status: 429,
+            headers: { "retry-after": "0" },
+          }),
+        )
+      }
+      return Promise.resolve(new Response("ok", { status: 200 }))
+    }) as unknown as typeof fetch
+
+    try {
+      const res = await helpers.fetchWithRetry(
+        "https://example.com",
+        {},
+        3,
+        mockFetch,
+      )
+      assert.equal(res.status, 200)
+      assert.equal(callCount, 2)
+    } finally {
+      if (typeof originalRetry429 === "string") {
+        process.env.OPENCODE_CLAUDE_AUTH_RETRY_429 = originalRetry429
+      } else {
+        delete process.env.OPENCODE_CLAUDE_AUTH_RETRY_429
+      }
+    }
   })
 
   it("fetchWithRetry retries on 529 and succeeds", async () => {
@@ -500,7 +564,7 @@ export function buildAccountLabels(creds) { return creds.map((_, i) => \`Account
     let callCount = 0
     const mockFetch = (() => {
       callCount++
-      return Promise.resolve(new Response("rate limited", { status: 429 }))
+      return Promise.resolve(new Response("overloaded", { status: 529 }))
     }) as unknown as typeof fetch
     const res = await helpers.fetchWithRetry(
       "https://example.com",
@@ -508,7 +572,7 @@ export function buildAccountLabels(creds) { return creds.map((_, i) => \`Account
       2,
       mockFetch,
     )
-    assert.equal(res.status, 429)
+    assert.equal(res.status, 529)
     assert.equal(callCount, 2)
   })
 
@@ -519,8 +583,8 @@ export function buildAccountLabels(creds) { return creds.map((_, i) => \`Account
       callCount++
       if (callCount === 1) {
         return Promise.resolve(
-          new Response("rate limited", {
-            status: 429,
+          new Response("overloaded", {
+            status: 529,
             headers: { "retry-after": "1" },
           }),
         )
@@ -541,8 +605,8 @@ export function buildAccountLabels(creds) { return creds.map((_, i) => \`Account
     const mockFetch = (() => {
       callCount++
       return Promise.resolve(
-        new Response("rate limited", {
-          status: 429,
+        new Response("overloaded", {
+          status: 529,
           headers: { "retry-after": "31" },
         }),
       )
@@ -554,7 +618,7 @@ export function buildAccountLabels(creds) { return creds.map((_, i) => \`Account
       mockFetch,
     )
     const elapsed = Date.now() - start
-    assert.equal(res.status, 429)
+    assert.equal(res.status, 529)
     assert.equal(callCount, 1, "should not retry when delay exceeds cap")
     assert.ok(elapsed < 5000, `Expected immediate return, got ${elapsed}ms`)
   })
@@ -571,8 +635,8 @@ export function buildAccountLabels(creds) { return creds.map((_, i) => \`Account
     const mockFetch = (() => {
       callCount++
       return Promise.resolve(
-        new Response("rate limited", {
-          status: 429,
+        new Response("overloaded", {
+          status: 529,
           headers: { "retry-after": "1" },
         }),
       )
@@ -586,7 +650,7 @@ export function buildAccountLabels(creds) { return creds.map((_, i) => \`Account
         mockFetch,
       )
       const elapsed = Date.now() - start
-      assert.equal(res.status, 429)
+      assert.equal(res.status, 529)
       assert.equal(
         callCount,
         1,
@@ -604,8 +668,8 @@ export function buildAccountLabels(creds) { return creds.map((_, i) => \`Account
       callCount++
       if (callCount === 1) {
         return Promise.resolve(
-          new Response("rate limited", {
-            status: 429,
+          new Response("overloaded", {
+            status: 529,
             headers: { "retry-after": "1" },
           }),
         )
@@ -629,8 +693,8 @@ export function buildAccountLabels(creds) { return creds.map((_, i) => \`Account
       callCount++
       if (callCount === 1) {
         return Promise.resolve(
-          new Response("rate limited", {
-            status: 429,
+          new Response("overloaded", {
+            status: 529,
             headers: { "retry-after": "not-a-number" },
           }),
         )
