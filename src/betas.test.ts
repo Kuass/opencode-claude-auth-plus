@@ -330,4 +330,52 @@ describe("betas", () => {
       delete process.env.ANTHROPIC_ENABLE_1M_CONTEXT
     }
   })
+
+  it("config.ccVersion matches upstream PR #240 Claude CLI version", () => {
+    assert.equal(config.ccVersion, "2.1.185")
+  })
+
+  it("baseBetas includes the three new PR #240 base betas", () => {
+    assert.ok(
+      config.baseBetas.includes("thinking-token-count-2026-05-13"),
+      "baseBetas should include thinking-token-count-2026-05-13",
+    )
+    assert.ok(
+      config.baseBetas.includes("extended-cache-ttl-2025-04-11"),
+      "baseBetas should include extended-cache-ttl-2025-04-11",
+    )
+    assert.ok(
+      config.baseBetas.includes("effort-2025-11-24"),
+      "baseBetas should include effort-2025-11-24",
+    )
+  })
+
+  it("getModelBetas('claude-opus-4-6') has no duplicate interleaved-thinking or effort betas", () => {
+    const savedFlags = process.env.ANTHROPIC_BETA_FLAGS
+    const saved1m = process.env.ANTHROPIC_ENABLE_1M_CONTEXT
+    delete process.env.ANTHROPIC_BETA_FLAGS
+    delete process.env.ANTHROPIC_ENABLE_1M_CONTEXT
+    try {
+      const betas = getModelBetas("claude-opus-4-6")
+      const interleavedBetas = betas.filter(
+        (beta) => beta === "interleaved-thinking-2025-05-14",
+      )
+      assert.equal(
+        interleavedBetas.length,
+        1,
+        "opus 4.6 should have exactly one interleaved-thinking beta (no upstream duplicate)",
+      )
+      const effortBetas = betas.filter((beta) => beta.includes("effort"))
+      assert.equal(
+        effortBetas.length,
+        1,
+        "opus 4.6 should have exactly one effort beta (base beta deduped against 4-6 override)",
+      )
+    } finally {
+      if (savedFlags !== undefined)
+        process.env.ANTHROPIC_BETA_FLAGS = savedFlags
+      if (saved1m !== undefined)
+        process.env.ANTHROPIC_ENABLE_1M_CONTEXT = saved1m
+    }
+  })
 })
