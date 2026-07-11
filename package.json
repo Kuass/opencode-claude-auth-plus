@@ -1,6 +1,6 @@
 {
   "name": "opencode-claude-auth-plus",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "description": "OpenCode plugin that uses your Claude Code credentials with hot credential reload support.",
   "keywords": [
     "anthropic",
