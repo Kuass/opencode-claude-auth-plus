@@ -42,7 +42,33 @@ This will prompt you to log in and store credentials in Keychain (macOS) or `~/.
 
 ## Installation
 
-### Step 1: Build the plugin
+### Recommended: npm package
+
+Edit `~/.config/opencode/opencode.json` or `~/.config/opencode/opencode.jsonc` and add `opencode-claude-auth-plus@latest` to the `plugin` array:
+
+```json
+{
+  "plugin": ["opencode-claude-auth-plus@latest"]
+}
+```
+
+Remove `opencode-claude-auth` from the same plugin list if it is present. Loading both plugins can make the Anthropic auth provider ambiguous.
+
+Verify the change:
+
+```bash
+cat ~/.config/opencode/opencode.json 2>/dev/null || cat ~/.config/opencode/opencode.jsonc
+```
+
+You should see `opencode-claude-auth-plus@latest` in the `plugin` array.
+
+Restart OpenCode. It will automatically use your Claude Code credentials — no separate login needed.
+
+### Alternative: local development setup
+
+Use this path only if you're working on this fork itself or testing unreleased changes, instead of the npm package.
+
+#### Step 1: Build the plugin
 
 Run these commands from this repository checkout:
 
@@ -51,7 +77,7 @@ npx pnpm@10.32.1 install --frozen-lockfile
 npx pnpm@10.32.1 run build
 ```
 
-### Step 2: Create a local OpenCode plugin shim
+#### Step 2: Create a local OpenCode plugin shim
 
 Create `~/.config/opencode/plugins/opencode-claude-auth-plus.ts` with an absolute import path to this checkout's compiled plugin:
 
@@ -68,7 +94,7 @@ EOF
 
 Replace `/absolute/path/to/opencode-claude-auth-plus` with this repository's absolute path.
 
-### Step 3: Add to OpenCode configuration
+#### Step 3: Add to OpenCode configuration
 
 Edit `~/.config/opencode/opencode.json` or `~/.config/opencode/opencode.jsonc`.
 
@@ -82,7 +108,7 @@ Add the local plugin to the `plugin` array:
 
 Remove `opencode-claude-auth` from the same plugin list if it is present. Loading both plugins can make the Anthropic auth provider ambiguous.
 
-### Step 4: Verification
+#### Step 4: Verification
 
 Verify the plugin was added:
 
@@ -94,7 +120,13 @@ You should see `./plugins/opencode-claude-auth-plus.ts` in the `plugin` array.
 
 ## Upgrading
 
-When this repo changes, rebuild the local plugin and restart OpenCode:
+For the npm package, OpenCode picks up new `opencode-claude-auth-plus@latest` releases automatically. If it doesn't, delete the cached package and restart OpenCode:
+
+```bash
+rm -rf ~/.cache/opencode/packages/opencode-claude-auth-plus@latest/
+```
+
+For a local development checkout, rebuild and restart OpenCode:
 
 ```bash
 npx pnpm@10.32.1 run build

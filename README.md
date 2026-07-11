@@ -4,7 +4,7 @@
 
 Self-contained Anthropic auth provider for OpenCode using your Claude Code credentials, with hot credential reload for tools like `claude-swap`.
 
-This fork is currently intended to be used as a local OpenCode plugin from this repository. The `opencode-claude-auth-plus` npm package has not been published yet.
+`opencode-claude-auth-plus` is published on npm and loads directly as an OpenCode plugin. Cloning and building this repository is only needed if you're developing the fork itself.
 
 ## Why this fork exists
 
@@ -53,17 +53,31 @@ macOS is preferred (uses Keychain). Linux and Windows work via the credentials f
 
 ## Installation
 
-**For Humans**
+**npm package (recommended)**
 
-**Option A: Let an LLM do it**
+Add the plugin to `~/.config/opencode/opencode.json` or `~/.config/opencode/opencode.jsonc`:
+
+```json
+{
+  "plugin": ["opencode-claude-auth-plus@latest"]
+}
+```
+
+Remove `opencode-claude-auth` from the same plugin list if it is present. Loading both plugins can make the Anthropic auth provider ambiguous. Restart OpenCode once after changing the plugin list — it handles auth automatically using your Claude Code credentials.
+
+**For LLM Agents**
 
 Paste this into any LLM agent (Claude Code, OpenCode, Cursor, etc.):
 
 ```
-Install the opencode-claude-auth-plus plugin from https://github.com/Kuass/opencode-claude-auth-plus as a local OpenCode plugin. Build the repo, create a local plugin shim under ~/.config/opencode/plugins/, and configure OpenCode to load ./plugins/opencode-claude-auth-plus.ts.
+Add "opencode-claude-auth-plus@latest" to the "plugin" array in ~/.config/opencode/opencode.json (or opencode.jsonc). Remove "opencode-claude-auth" from the same array if present. Then restart OpenCode.
 ```
 
-**Option B: Manual local setup**
+See [installation.md](installation.md) for step-by-step agent instructions.
+
+**Local development setup (contributors)**
+
+Use this path only if you're working on this fork itself or testing unreleased changes, instead of the npm package:
 
 1. **Clone and build this repo**:
 
@@ -100,20 +114,6 @@ Install the opencode-claude-auth-plus plugin from https://github.com/Kuass/openc
    Remove `opencode-claude-auth` from the same plugin list if it is present. Loading both plugins can make the Anthropic auth provider ambiguous.
 
 4. **Use it** — restart OpenCode once after changing the plugin list. The plugin handles auth automatically using your Claude Code credentials.
-
-**For LLM Agents**
-
-See [installation.md](installation.md) for step-by-step agent instructions.
-
-**npm package**
-
-After `opencode-claude-auth-plus` is published to npm, OpenCode can load it directly:
-
-```json
-{
-  "plugin": ["opencode-claude-auth-plus@latest"]
-}
-```
 
 ## Usage
 
@@ -176,18 +176,18 @@ export OPENCODE_CLAUDE_AUTH_CREDENTIAL_CACHE_TTL_MS=30000
 
 ## Troubleshooting
 
-| Problem                                             | Solution                                                                                                                                                |
-| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| "Credentials not found"                             | Run `claude` to authenticate with Claude Code first                                                                                                     |
-| "Keychain is locked"                                | Run `security unlock-keychain ~/Library/Keychains/login.keychain-db`                                                                                    |
-| "Token expired and refresh failed"                  | The plugin runs `claude` CLI to refresh automatically. If this fails, re-authenticate manually by running `claude`                                      |
-| Not working on Linux/Windows                        | Ensure `~/.claude/.credentials.json` exists. Run `claude` to create it                                                                                  |
-| Keychain access denied                              | Grant access when macOS prompts you                                                                                                                     |
-| Keychain read timed out                             | Restart Keychain Access (can happen on macOS Tahoe)                                                                                                     |
-| "Credentials are unavailable or expired"            | Run `claude` to refresh your Claude Code credentials                                                                                                    |
-| "Extra usage is required for long context requests" | Your conversation exceeded 200k tokens, or your plan doesn't cover extended context usage. See [Long context (1M)](#long-context-1m) below              |
-| Local plugin changes not picked up                  | Rebuild this repo with `npx pnpm@10.32.1 run build`, then restart OpenCode                                                                              |
-| npm package not updating to latest version          | After npm publishing is enabled, delete the cached package: `rm -rf ~/.cache/opencode/packages/opencode-claude-auth-plus@latest/` then restart OpenCode |
+| Problem                                             | Solution                                                                                                                                   |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| "Credentials not found"                             | Run `claude` to authenticate with Claude Code first                                                                                        |
+| "Keychain is locked"                                | Run `security unlock-keychain ~/Library/Keychains/login.keychain-db`                                                                       |
+| "Token expired and refresh failed"                  | The plugin runs `claude` CLI to refresh automatically. If this fails, re-authenticate manually by running `claude`                         |
+| Not working on Linux/Windows                        | Ensure `~/.claude/.credentials.json` exists. Run `claude` to create it                                                                     |
+| Keychain access denied                              | Grant access when macOS prompts you                                                                                                        |
+| Keychain read timed out                             | Restart Keychain Access (can happen on macOS Tahoe)                                                                                        |
+| "Credentials are unavailable or expired"            | Run `claude` to refresh your Claude Code credentials                                                                                       |
+| "Extra usage is required for long context requests" | Your conversation exceeded 200k tokens, or your plan doesn't cover extended context usage. See [Long context (1M)](#long-context-1m) below |
+| Local plugin changes not picked up                  | Rebuild this repo with `npx pnpm@10.32.1 run build`, then restart OpenCode                                                                 |
+| npm package not updating to latest version          | Delete the cached package: `rm -rf ~/.cache/opencode/packages/opencode-claude-auth-plus@latest/` then restart OpenCode                     |
 
 ### Diagnostic logging
 
