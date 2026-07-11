@@ -7,8 +7,9 @@
 * reload every credential source on cache miss so `claude-swap` macOS Keychain switches are picked up without restarting OpenCode
 * default credential cache TTL to `0` for hot reload; set `OPENCODE_CLAUDE_AUTH_CREDENTIAL_CACHE_TTL_MS=30000` to restore upstream-style caching
 * surface HTTP 429 responses immediately by default so upstream fallback handlers can react sooner; set `OPENCODE_CLAUDE_AUTH_RETRY_429=true` to restore capped internal retries
-* bump the Claude CLI compatibility header (`ccVersion` to `2.1.185`) and add three new base beta flags (`thinking-token-count-2026-05-13`, `extended-cache-ttl-2025-04-11`, `effort-2025-11-24`) to match current Claude CLI parity ([#240](https://github.com/griffinmartin/opencode-claude-auth/pull/240))
+* bump the Claude CLI compatibility header (`ccVersion` to `2.1.185`) and add three new base beta flags (`thinking-token-count-2026-05-13`, `extended-cache-ttl-2025-04-11`, `effort-2025-11-24`) to match current Claude CLI parity, aligning with upstream's native 1M context behavior ([#240](https://github.com/griffinmartin/opencode-claude-auth/pull/240))
 * cap `thinking.budget_tokens` to 80% of `max_tokens` whenever it meets or exceeds `max_tokens`, matching Anthropic's validation and avoiding a rejected request ([#143](https://github.com/griffinmartin/opencode-claude-auth/pull/143))
+* **BREAKING:** remove the `ANTHROPIC_ENABLE_1M_CONTEXT` environment variable and the `enable1mContext` agent config option; the legacy `context-1m-2025-08-07` beta is never sent by this plugin regardless of config, aligning with upstream's native 1M context handling. Custom `ANTHROPIC_BETA_FLAGS` long-context error recovery (retrying without the offending flag) is unchanged
 
 ## [1.5.4](https://github.com/griffinmartin/opencode-claude-auth/compare/v1.5.3...v1.5.4) (2026-05-15)
 
