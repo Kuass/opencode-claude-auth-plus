@@ -449,6 +449,66 @@ describe("transforms", () => {
     assert.equal(parsed.thinking, undefined)
   })
 
+  it("transformBody caps thinking.budget_tokens when equal to max_tokens", () => {
+    const input = JSON.stringify({
+      model: "claude-opus-4-6",
+      max_tokens: 128000,
+      thinking: { type: "enabled", budget_tokens: 128000 },
+      messages: [{ role: "user", content: "test" }],
+    })
+
+    const output = transformBody(input)
+    const parsed = JSON.parse(output as string) as {
+      thinking?: { budget_tokens?: number }
+    }
+
+    assert.equal(
+      parsed.thinking!.budget_tokens,
+      102400,
+      "budget_tokens equal to max_tokens should be capped to floor(max_tokens * 0.8)",
+    )
+  })
+
+  it("transformBody caps thinking.budget_tokens when greater than max_tokens", () => {
+    const input = JSON.stringify({
+      model: "claude-opus-4-6",
+      max_tokens: 32000,
+      thinking: { type: "enabled", budget_tokens: 50000 },
+      messages: [{ role: "user", content: "test" }],
+    })
+
+    const output = transformBody(input)
+    const parsed = JSON.parse(output as string) as {
+      thinking?: { budget_tokens?: number }
+    }
+
+    assert.equal(
+      parsed.thinking!.budget_tokens,
+      25600,
+      "budget_tokens greater than max_tokens should be capped to floor(max_tokens * 0.8)",
+    )
+  })
+
+  it("transformBody preserves valid thinking.budget_tokens below max_tokens", () => {
+    const input = JSON.stringify({
+      model: "claude-opus-4-6",
+      max_tokens: 128000,
+      thinking: { type: "enabled", budget_tokens: 100000 },
+      messages: [{ role: "user", content: "test" }],
+    })
+
+    const output = transformBody(input)
+    const parsed = JSON.parse(output as string) as {
+      thinking?: { budget_tokens?: number }
+    }
+
+    assert.equal(
+      parsed.thinking!.budget_tokens,
+      100000,
+      "budget_tokens below max_tokens should pass through unchanged",
+    )
+  })
+
   it("transformBody PascalCase-prefixes tool names with mcp_", () => {
     const input = JSON.stringify({
       system: [],

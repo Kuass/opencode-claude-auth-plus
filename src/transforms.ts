@@ -96,6 +96,8 @@ export function transformBody(
   try {
     const parsed = JSON.parse(body) as {
       model?: string
+      // eslint-disable-next-line @typescript-eslint/naming-convention
+      max_tokens?: number
       system?: SystemEntry[]
       thinking?: Record<string, unknown>
       // eslint-disable-next-line @typescript-eslint/naming-convention
@@ -220,6 +222,18 @@ export function transformBody(
           delete parsed.thinking
         }
       }
+    }
+
+    // Cap thinking.budget_tokens when it meets or exceeds max_tokens.
+    // Anthropic rejects budget_tokens >= max_tokens; clamp to 80% of
+    // max_tokens as a defensive API-compatibility fix (upstream PR #143).
+    if (
+      parsed.thinking &&
+      typeof parsed.thinking.budget_tokens === "number" &&
+      typeof parsed.max_tokens === "number" &&
+      parsed.thinking.budget_tokens >= parsed.max_tokens
+    ) {
+      parsed.thinking.budget_tokens = Math.floor(parsed.max_tokens * 0.8)
     }
 
     // Anthropic's OAuth billing validation rejects lowercase tool names
