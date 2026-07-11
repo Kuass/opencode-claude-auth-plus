@@ -1,6 +1,6 @@
 {
   "name": "opencode-claude-auth-plus",
-  "version": "1.5.4-plus.0",
+  "version": "2.0.0",
   "description": "OpenCode plugin that uses your Claude Code credentials with hot credential reload support.",
   "keywords": [
     "anthropic",
@@ -59,7 +59,8 @@
     }
   },
   "scripts": {
-    "build": "tsc && cp src/anthropic-prompt.txt dist/",
+    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
+    "build": "npm run clean && tsc && cp src/anthropic-prompt.txt dist/",
     "test": "node --test --experimental-strip-types src/**/*.test.ts",
     "test:models": "pnpm run build && node scripts/test-models.ts",
     "intercept": "pnpm run build && node --experimental-strip-types scripts/intercept-claude.ts",
@@ -69,7 +70,7 @@
     "lint": "oxlint && oxfmt --check .",
     "lint:fix": "oxlint --fix . && oxfmt --write .",
     "format": "oxfmt --write .",
-    "prepublishOnly": "pnpm run build && pnpm test"
+    "prepublishOnly": "npm run build && npm test"
   },
   "devDependencies": {
     "@opencode-ai/plugin": "latest",
